@@ -1,0 +1,34 @@
+name: Publish NPM Package
+
+# Bu robot sadece GitHub'da yeni bir Release (Sürüm) yayınlandığında çalışır
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Kodları Çek
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Node.js Kurulumu
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Modern ve stabil LTS sürümü
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: 📦 Bağımlılıkları Yükle
+        # npm install yerine npm ci kullanıyoruz, çünkü CI/CD ortamında 
+        # package-lock.json dosyasının birebir aynısının kurulması en güvenlisidir.
+        run: npm ci
+
+      - name: 🏗️ TypeScript Kodunu Derle (Build)
+        run: npm run build
+
+      - name: 🚀 NPM'e Fırlat
+        run: npm publish --access public
+        env:
+          # GitHub kasasından şifreyi alıp NPM'e veriyoruz
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
