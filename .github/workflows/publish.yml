@@ -22,7 +22,7 @@ jobs:
       - name: 📦 Bağımlılıkları Yükle
         # npm install yerine npm ci kullanıyoruz, çünkü CI/CD ortamında 
         # package-lock.json dosyasının birebir aynısının kurulması en güvenlisidir.
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: 🏗️ TypeScript Kodunu Derle (Build)
         run: npm run build
