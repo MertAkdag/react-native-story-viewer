@@ -1,0 +1,66 @@
+{
+  "name": "@mertakdag/react-native-story-viewer",
+  "version": "1.0.0",
+  "description": "Instagram/Snapchat/Whatsapp style story viewer for React Native / Expo",
+  "main": "lib/commonjs/index.js",
+  "module": "lib/module/index.js",
+  "types": "lib/typescript/index.d.ts",
+  "react-native": "src/index.ts",
+  "source": "src/index.ts",
+  "files": [
+    "src",
+    "lib",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/__mocks__"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "bob build",
+    "prepare": "bob build"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "story",
+    "viewer",
+    "instagram-stories"
+  ],
+  "author": "Mert Akdag",
+  "license": "MIT",
+  "peerDependencies": {
+    "expo-image": "*",
+    "expo-video": "*",
+    "react": "*",
+    "react-native": "*",
+    "react-native-gesture-handler": "*",
+    "react-native-reanimated": "*",
+    "react-native-safe-area-context": "*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "expo-image": "^55.0.9",
+    "expo-video": "^55.0.15",
+    "react": "^18.2.0",
+    "react-native": "^0.73.0",
+    "react-native-builder-bob": "^0.30.0",
+    "react-native-gesture-handler": "^2.31.1",
+    "react-native-reanimated": "^4.3.0",
+    "react-native-safe-area-context": "^5.7.0",
+    "typescript": "^5.0.0"
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      "commonjs",
+      "module",
+      [
+        "typescript",
+        {
+          "project": "tsconfig.json"
+        }
+      ]
+    ]
+  }
+}
