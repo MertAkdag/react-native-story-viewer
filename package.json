@@ -1,32 +1,50 @@
 {
   "name": "@mertakdag/react-native-story-viewer",
-  "version": "1.0.0",
-  "description": "Instagram/Snapchat/Whatsapp style story viewer for React Native / Expo",
+  "version": "1.1.0",
+  "description": "Instagram & Snapchat-style story tray and full-screen story viewer for React Native & Expo — with image/video sync, gestures, and a headless hook API.",
   "main": "lib/commonjs/index.js",
   "module": "lib/module/index.js",
   "types": "lib/typescript/index.d.ts",
   "react-native": "src/index.ts",
   "source": "src/index.ts",
+  "homepage": "https://github.com/MertAkdag/react-native-story-viewer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MertAkdag/react-native-story-viewer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MertAkdag/react-native-story-viewer/issues"
+  },
   "files": [
     "src",
     "lib",
+    "!**/.DS_Store",
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__"
   ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "build": "bob build",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck && npm run build && node --test tests/*.test.mjs",
     "prepare": "bob build"
   },
   "keywords": [
     "react-native",
     "expo",
-    "story",
-    "viewer",
-    "instagram-stories"
+    "stories",
+    "story-viewer",
+    "instagram-stories",
+    "snapchat-stories",
+    "story-tray",
+    "reanimated",
+    "gesture-handler",
+    "expo-video",
+    "expo-image",
+    "headless-ui",
+    "typescript"
   ],
-  "author": "Mert Akdag",
+  "author": "Mert Akdag <mert@mertakdag.com> (https://mertakdag.com)",
   "license": "MIT",
   "peerDependencies": {
     "expo-image": "*",

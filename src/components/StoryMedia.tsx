@@ -1,51 +1,31 @@
-/**
- * StoryMedia — Story Media Renderer
- *
- * Renders the background media of the story:
- * - `image` → full-screen display with expo-image
- * - `video` → with expo-video VideoView component
- *
- * Performance:
- * - expo-image already uses disk/memory cache
- * - Video `shouldPlay` and `isLooping` controls are managed via `isPaused` prop
- *
- * Synchronization:
- * - Progress bar doesn't start until `onMediaReady` callback is triggered
- * - Transitions to the next story when the video ends via `onVideoEnd` callback
- *
- * Error state:
- * - Shows a black background if media fails to load (graceful degradation)
- */
-
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Image } from 'expo-image';
-import type { StoryMediaProps } from '../types/story.types';
-
+import type { StoryMediaProps, StoryMediaReadyMeta } from '../types/story.types';
 
 export function StoryMedia({
   mediaUrl,
   mediaType,
   posterUrl,
   isPaused = false,
+  isMuted = false,
   onMediaReady,
   onVideoEnd,
 }: StoryMediaProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const readyFiredRef = useRef(false);
 
-  // Reset states when mediaUrl changes
   useEffect(() => {
     setIsLoading(true);
     setHasError(false);
-  }, [mediaUrl]);
+    readyFiredRef.current = false;
+  }, [mediaUrl, mediaType]);
 
   if (hasError || !mediaUrl) {
     return <View style={[styles.media, styles.errorFallback]} />;
   }
-
-  console.log(`[StoryMedia] Loaded Media URL (${mediaType}):`, mediaUrl);
 
   if (mediaType === 'video') {
     return (
@@ -53,6 +33,7 @@ export function StoryMedia({
         uri={mediaUrl}
         posterUrl={posterUrl}
         isPaused={isPaused}
+        isMuted={isMuted}
         onReady={onMediaReady}
         onEnd={onVideoEnd}
         onError={() => setHasError(true)}
@@ -60,23 +41,25 @@ export function StoryMedia({
     );
   }
 
-  // Image rendering
   return (
     <View style={styles.media}>
       {isLoading && (
-        <View style={styles.loaderOverlay}>
-          <ActivityIndicator size="large" color="rgba(255, 255, 255, 0.7)" />
+        <View style={styles.loaderOverlay} pointerEvents="none">
+          <ActivityIndicator size="large" color="rgba(255, 255, 255, 0.75)" />
         </View>
       )}
       <Image
         source={{ uri: mediaUrl }}
         style={styles.media}
         contentFit="cover"
-        transition={200}
+        transition={180}
         onLoadStart={() => setIsLoading(true)}
-        onLoadEnd={() => {
+        onLoad={() => {
           setIsLoading(false);
-          onMediaReady?.();
+          if (!readyFiredRef.current) {
+            readyFiredRef.current = true;
+            onMediaReady?.();
+          }
         }}
         onError={() => {
           setIsLoading(false);
@@ -87,19 +70,11 @@ export function StoryMedia({
   );
 }
 
-/**
- * Video player sub-component.
- * Uses expo-video (SDK 54+).
- *
- * Lifecycle:
- * 1. Player is created → video buffering starts
- * 2. When status is 'readyToPlay' → `onReady` is called (progress bar starts)
- * 3. When status is 'idle' (and was previously playing) → `onEnd` is called
- */
 function VideoPlayer({
   uri,
   posterUrl,
   isPaused,
+  isMuted,
   onReady,
   onEnd,
   onError,
@@ -107,55 +82,78 @@ function VideoPlayer({
   uri: string;
   posterUrl?: string | null;
   isPaused: boolean;
-  onReady?: () => void;
+  isMuted: boolean;
+  onReady?: (meta?: StoryMediaReadyMeta) => void;
   onEnd?: () => void;
   onError: () => void;
 }) {
+  const [isReady, setIsReady] = useState(false);
   const readyFiredRef = useRef(false);
+  const isPausedRef = useRef(isPaused);
+  isPausedRef.current = isPaused;
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
-  const player = useVideoPlayer(uri, player => {
-    player.loop = false;
-    player.muted = false;
-    // Do not trigger playback — wait for readyToPlay callback
+  const player = useVideoPlayer(uri, (instance) => {
+    instance.loop = false;
+    instance.muted = isMuted;
   });
 
-  // Listen for status changes
+  useEffect(() => {
+    setIsReady(false);
+    readyFiredRef.current = false;
+  }, [uri]);
+
   useEffect(() => {
     if (!player) return;
 
-    // Reset ref for each new video
     readyFiredRef.current = false;
 
-    // @ts-ignore: expo-video types might not expose addListener correctly
-    const statusSub = player.addListener('statusChange', (event: any) => {
-      if (event.error) {
-        console.warn(`[StoryMedia] Video error (${uri}):`, event.error.message, event.error);
-        onError();
+    const statusSub = (player as any).addListener('statusChange', (event: any) => {
+      if (event?.error) {
+        onErrorRef.current();
         return;
       }
 
-      if (event.status === 'readyToPlay' && !readyFiredRef.current) {
+      if (event?.status === 'readyToPlay' && !readyFiredRef.current) {
         readyFiredRef.current = true;
-        onReady?.();
-        if (!isPaused) {
+        setIsReady(true);
+
+        const rawSeconds = typeof (player as any).duration === 'number'
+          ? (player as any).duration
+          : 0;
+        const durationMs =
+          rawSeconds > 0 && Number.isFinite(rawSeconds)
+            ? Math.round(rawSeconds * 1000)
+            : undefined;
+
+        onReadyRef.current?.({ durationMs });
+
+        if (!isPausedRef.current) {
           player.play();
         }
       }
     });
 
-    // Triggered when video reaches the end
-    // @ts-ignore
-    const endSub = player.addListener('playToEnd', () => {
-      onEnd?.();
+    const endSub = (player as any).addListener('playToEnd', () => {
+      onEndRef.current?.();
     });
 
     return () => {
-      statusSub.remove();
-      endSub.remove();
+      statusSub?.remove?.();
+      endSub?.remove?.();
     };
   }, [player, uri]);
 
-  // Play/pause when isPaused prop changes
+  useEffect(() => {
+    if (!player) return;
+    player.muted = isMuted;
+  }, [isMuted, player]);
+
   useEffect(() => {
     if (!player || !readyFiredRef.current) return;
     if (isPaused) {
@@ -166,12 +164,28 @@ function VideoPlayer({
   }, [isPaused, player]);
 
   return (
-    <VideoView
-      style={styles.media}
-      player={player}
-      nativeControls={false}
-      contentFit="cover"
-    />
+    <View style={styles.media}>
+      <VideoView
+        style={styles.media}
+        player={player}
+        nativeControls={false}
+        contentFit="cover"
+      />
+      {!isReady && (
+        <View style={styles.posterOverlay} pointerEvents="none">
+          {posterUrl ? (
+            <Image
+              source={{ uri: posterUrl }}
+              style={styles.media}
+              contentFit="cover"
+            />
+          ) : null}
+          <View style={styles.loaderOverlay}>
+            <ActivityIndicator size="large" color="rgba(255, 255, 255, 0.8)" />
+          </View>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -181,6 +195,10 @@ const styles = StyleSheet.create({
   },
   errorFallback: {
     backgroundColor: '#111111',
+  },
+  posterOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
   },
   loaderOverlay: {
     ...StyleSheet.absoluteFillObject,

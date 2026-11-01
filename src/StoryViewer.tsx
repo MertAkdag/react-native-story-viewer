@@ -1,36 +1,4 @@
-/**
- * StoryViewer — Main Orchestrator Component
- *
- * Instagram/Snapchat/Whatsapp style full-screen story viewer.
- *
- * This component is a "thin shell" — all business logic lives in the `useStoryViewer` hook,
- * all visual parts live in sub-components. This component only orchestrates them.
- *
- * Features:
- * ──────────
- * - ✅ Segmented progress bar (separate for each story, animated)
- * - ✅ Next/prev navigation with left/right tap
- * - ✅ Swipe down to close (with spring effect)
- * - ✅ Long press to pause/resume
- * - ✅ CTA buttons (optional)
- * - ✅ Image + Video media support
- * - ✅ Transition between groups
- *
- * @example
- * ```tsx
- * <StoryViewer
- *   groups={storyGroups}
- *   initialGroupIndex={0}
- *   isVisible={isVisible}
- *   onClose={() => setIsVisible(false)}
- *   onCtaPress={(cta) => router.push(cta.value)}
- *   onStorySeen={(story) => api.markSeen(story.id)}
- *   config={{ defaultDurationMs: 5000 }}
- * />
- * ```
- */
-
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Modal,
@@ -43,18 +11,23 @@ import {
   GestureHandlerRootView,
   Gesture,
 } from 'react-native-gesture-handler';
-import type { StoryViewerProps } from './types/story.types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { StoryHeaderProps, StoryViewerProps } from './types/story.types';
 import { useStoryViewer } from './hooks/useStoryViewer';
 import { StoryProgressBar } from './components/StoryProgressBar';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoryHeader } from './components/StoryHeader';
 import { StoryMedia } from './components/StoryMedia';
 import { StoryCta } from './components/StoryCta';
+import { isStoryGroupSeen } from './utils/story.utils';
+
+const DEFAULT_SEEN_RING = '#9CA3AF';
+const DEFAULT_UNSEEN_RING = '#E1306C';
 
 export default function StoryViewer(props: StoryViewerProps) {
   const {
     groups,
     initialGroupIndex,
+    initialStoryIndex,
     isVisible,
     config,
     theme,
@@ -67,73 +40,100 @@ export default function StoryViewer(props: StoryViewerProps) {
     onStorySeen,
   } = props;
 
+  // All hooks MUST run unconditionally before any early returns
+  const insets = useSafeAreaInsets();
   const viewer = useStoryViewer({
     groups,
     initialGroupIndex,
+    initialStoryIndex,
     isVisible,
     config,
-    callbacks: { onClose, onCtaPress, onStoryChange, onGroupChange, onComplete, onStorySeen },
+    callbacks: {
+      onClose,
+      onCtaPress,
+      onStoryChange,
+      onGroupChange,
+      onComplete,
+      onStorySeen,
+    },
   });
 
-  // Do not render if there is no data
-  if (!viewer.currentGroup || !viewer.currentStory) return null;
+  const composedGesture = useMemo(
+    () => Gesture.Simultaneous(viewer.panGesture, viewer.longPressGesture),
+    [viewer.panGesture, viewer.longPressGesture],
+  );
+
+  if (!isVisible || !viewer.currentGroup || !viewer.currentStory) {
+    return null;
+  }
 
   const { currentGroup, currentStory } = viewer;
-  const insets = useSafeAreaInsets();
+  const bgColor = theme?.backgroundColor || '#000000';
+  const groupSeen = isStoryGroupSeen(currentGroup);
+  const ringColor = groupSeen
+    ? (theme?.seenRingColor ?? DEFAULT_SEEN_RING)
+    : (theme?.unseenRingColor ?? DEFAULT_UNSEEN_RING);
 
-  const bgColor = theme?.backgroundColor || 'black';
+  const showMuteButton =
+    (config?.showMuteButton ?? true) && currentStory.mediaType === 'video';
 
-  // Combine Pan + LongPress gestures
-  // Simultaneous: both gestures can be active at the same time
-  const composedGesture = Gesture.Simultaneous(
-    viewer.panGesture,
-    viewer.longPressGesture,
+  const headerProps: StoryHeaderProps = {
+    avatarUrl: currentGroup.avatarUrl,
+    name: currentGroup.name,
+    timestamp: currentStory.timestamp,
+    ringColor,
+    showMuteButton,
+    isMuted: viewer.isMuted,
+    onToggleMute: viewer.toggleMute,
+    onClose,
+    renderMuteButton: customComponents?.renderMuteButton,
+    renderCloseButton: customComponents?.renderCloseButton,
+  };
+
+  const hasBottomOverlay = Boolean(
+    (currentStory.cta && onCtaPress) || customComponents?.renderFooter,
   );
 
   return (
-    <Modal visible={isVisible} transparent animationType="fade">
-      <GestureHandlerRootView style={[styles.root, { backgroundColor: bgColor }]}>
+    <Modal
+      visible={isVisible}
+      transparent
+      statusBarTranslucent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <GestureHandlerRootView
+        style={[styles.root, { backgroundColor: bgColor }]}
+      >
         <GestureDetector gesture={composedGesture}>
           <Animated.View
-            style={[styles.container, viewer.containerAnimatedStyle, { backgroundColor: bgColor }]}
+            style={[
+              styles.container,
+              viewer.containerAnimatedStyle,
+              { backgroundColor: bgColor },
+            ]}
           >
-            {/* ── 1. Background Media ── */}
+            {/* 1. Background Media */}
             <StoryMedia
               mediaUrl={currentStory.mediaUrl}
               mediaType={currentStory.mediaType}
               posterUrl={currentStory.posterUrl}
               isPaused={viewer.isPaused}
+              isMuted={viewer.isMuted}
               onMediaReady={viewer.notifyMediaReady}
               onVideoEnd={viewer.notifyVideoEnd}
             />
 
-            {/* ── 2. Top Layer: Progress Bar + Header ── */}
-            <View style={[styles.header, { top: insets.top }]}>
-              <StoryProgressBar
-                totalCount={currentGroup.stories.length}
-                currentIndex={viewer.currentStoryIndex}
-                progress={viewer.progress}
-              />
-              <StoryHeader
-                avatarUrl={currentGroup.avatarUrl}
-                name={currentGroup.name}
-                onClose={onClose}
-                renderCloseButton={customComponents?.renderCloseButton}
-              />
-            </View>
+            {/* 2. Subtle Top & Bottom Readability Scrims */}
+            <View
+              pointerEvents="none"
+              style={[styles.topScrim, { height: Math.max(insets.top, 20) + 84 }]}
+            />
+            {hasBottomOverlay ? (
+              <View pointerEvents="none" style={styles.bottomScrim} />
+            ) : null}
 
-            {/* ── 3. CTA Button (if any) ── */}
-            {currentStory.cta && onCtaPress && (
-              <StoryCta
-                cta={currentStory.cta}
-                onPress={() =>
-                  onCtaPress(currentStory.cta!, currentStory, currentGroup)
-                }
-                renderCtaIcon={customComponents?.renderCtaIcon}
-              />
-            )}
-
-            {/* ── 4. Touch Areas (Next / Prev) ── */}
+            {/* 3. Left / Right Tap Navigation Zones (35% back / 65% next) */}
             <View style={styles.touchAreas}>
               <TouchableWithoutFeedback onPress={viewer.handlePrev}>
                 <View style={styles.touchLeft} />
@@ -142,6 +142,45 @@ export default function StoryViewer(props: StoryViewerProps) {
                 <View style={styles.touchRight} />
               </TouchableWithoutFeedback>
             </View>
+
+            {/* 4. Top Overlay: Progress Bar + Header (rendered above touch zones) */}
+            <View
+              pointerEvents="box-none"
+              style={[styles.header, { top: Math.max(insets.top, 14) + 6 }]}
+            >
+              <StoryProgressBar
+                totalCount={currentGroup.stories.length}
+                currentIndex={viewer.currentStoryIndex}
+                progress={viewer.progress}
+                activeColor={theme?.progressActiveColor}
+                inactiveColor={theme?.progressInactiveColor}
+              />
+              {customComponents?.renderHeader ? (
+                customComponents.renderHeader(headerProps)
+              ) : (
+                <StoryHeader {...headerProps} />
+              )}
+            </View>
+
+            {/* 5. Bottom Overlay: CTA Button or Custom Footer */}
+            {currentStory.cta && onCtaPress ? (
+              <StoryCta
+                cta={currentStory.cta}
+                onPress={() => {
+                  if (config?.pauseOnCtaPress !== false) {
+                    viewer.pauseProgress();
+                  }
+                  onCtaPress(currentStory.cta!, currentStory, currentGroup);
+                }}
+                renderCtaIcon={customComponents?.renderCtaIcon}
+              />
+            ) : null}
+
+            {customComponents?.renderFooter ? (
+              <View pointerEvents="box-none" style={styles.footerSlot}>
+                {customComponents.renderFooter(currentStory, currentGroup)}
+              </View>
+            ) : null}
           </Animated.View>
         </GestureDetector>
       </GestureHandlerRootView>
@@ -155,24 +194,46 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     overflow: 'hidden',
   },
-  header: {
+  topScrim: {
     position: 'absolute',
-    top: 50,
-    width: '100%',
-    paddingHorizontal: 10,
-    zIndex: 10,
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.24)',
+  },
+  bottomScrim: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 128,
+    backgroundColor: 'rgba(0, 0, 0, 0.26)',
   },
   touchAreas: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
   },
   touchLeft: {
-    flex: 1,
+    flex: 35,
   },
   touchRight: {
-    flex: 1,
+    flex: 65,
+  },
+  header: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    paddingHorizontal: 12,
+    zIndex: 10,
+  },
+  footerSlot: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
   },
 });

@@ -1,19 +1,12 @@
-/**
- * useStoryViewer — Story Viewer Business Logic Hook
- *
- * This hook encapsulates ALL state management, animation logic,
- * gesture handling, and seen-tracking functions of the StoryViewer component.
- *
- * The component itself (StoryViewer.tsx) remains a thin "orchestrator",
- * while this hook acts as the "brain".
- */
-
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Image } from 'expo-image';
 import {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
   withTiming,
+  interpolate,
+  Extrapolation,
   Easing,
   runOnJS,
   cancelAnimation,
@@ -22,50 +15,81 @@ import { Gesture } from 'react-native-gesture-handler';
 import type {
   StoryGroup,
   StoryItem,
+  StoryMediaReadyMeta,
   StoryViewerConfig,
   StoryViewerCallbacks,
 } from '../types/story.types';
-
-// ─────────────────────────────────────────────
-// Config Defaults
-// ─────────────────────────────────────────────
+import {
+  getPrefetchUrls,
+  resolveInitialStoryIndex,
+  resolveStoryDurationMs,
+} from '../utils/story.utils';
 
 const DEFAULT_CONFIG: Required<StoryViewerConfig> = {
   defaultDurationMs: 5000,
   dismissThreshold: 150,
+  swipeHorizontalThreshold: 60,
+  defaultMuted: false,
+  showMuteButton: true,
+  startFromFirstUnseen: true,
+  prefetchNextMedia: true,
+  pauseOnCtaPress: true,
 };
 
-// ─────────────────────────────────────────────
-// Hook
-// ─────────────────────────────────────────────
-
-export function useStoryViewer(params: {
+export type UseStoryViewerParams = {
   groups: StoryGroup[];
   initialGroupIndex?: number;
+  initialStoryIndex?: number;
   isVisible: boolean;
   config?: StoryViewerConfig;
   callbacks: StoryViewerCallbacks;
-}) {
+};
+
+export function useStoryViewer(params: UseStoryViewerParams) {
   const { groups, isVisible, callbacks } = params;
-  const config = { ...DEFAULT_CONFIG, ...params.config };
+  const config: Required<StoryViewerConfig> = {
+    ...DEFAULT_CONFIG,
+    ...params.config,
+  };
+
+  const initialGroupIdx = Math.max(
+    0,
+    Math.min(params.initialGroupIndex ?? 0, Math.max(groups.length - 1, 0)),
+  );
 
   // ── State ──
-  const [currentGroupIndex, setCurrentGroupIndex] = useState(
-    params.initialGroupIndex ?? 0,
+  const [currentGroupIndex, setCurrentGroupIndex] = useState(initialGroupIdx);
+  const [currentStoryIndex, setCurrentStoryIndex] = useState(() =>
+    resolveInitialStoryIndex(
+      groups[initialGroupIdx],
+      params.initialStoryIndex,
+      config.startFromFirstUnseen,
+    ),
   );
-  const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(config.defaultMuted);
   const [isMediaReady, setIsMediaReady] = useState(false);
 
   // ── Reanimated Shared Values ──
   const progress = useSharedValue(0);
+  const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+  const gestureAxis = useSharedValue<'none' | 'vertical' | 'horizontal'>('none');
 
-  // ── Refs (prevent stale closure) ──
+  // ── Refs (prevent stale closures inside gestures & animation callbacks) ──
   const handleNextRef = useRef<() => void>(() => {});
   const handlePrevRef = useRef<() => void>(() => {});
+  const handleNextGroupRef = useRef<() => void>(() => {});
+  const handlePrevGroupOrResumeRef = useRef<() => void>(() => {});
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
+
+  const isPausedRef = useRef(isPaused);
+  isPausedRef.current = isPaused;
+  const isMediaReadyRef = useRef(isMediaReady);
+  isMediaReadyRef.current = isMediaReady;
+  const detectedDurationMsRef = useRef<number | undefined>(undefined);
+  const activeDurationMsRef = useRef<number>(config.defaultDurationMs);
 
   // ── Derived Values ──
   const currentGroup: StoryGroup | undefined = groups[currentGroupIndex];
@@ -73,74 +97,41 @@ export function useStoryViewer(params: {
     currentGroup?.stories[currentStoryIndex];
 
   // ─────────────────────────────────────────
-  // Navigation (ref-based to avoid stale closures)
+  // Progress Animation
   // ─────────────────────────────────────────
 
-  /** Go to next story or group. If last story, call onComplete and close. */
   const handleNext = useCallback(() => {
     handleNextRef.current();
   }, []);
 
-  /** Go back to previous story or group. Do nothing if first story. */
   const handlePrev = useCallback(() => {
     handlePrevRef.current();
   }, []);
 
-  // Ref updates — capture current state on every render
-  useEffect(() => {
-    handleNextRef.current = () => {
-      if (!currentGroup) return;
+  const handleNextGroup = useCallback(() => {
+    handleNextGroupRef.current();
+  }, []);
 
-      if (currentStoryIndex < currentGroup.stories.length - 1) {
-        const nextIndex = currentStoryIndex + 1;
-        setCurrentStoryIndex(nextIndex);
-      } else if (currentGroupIndex < groups.length - 1) {
-        const nextGroupIndex = currentGroupIndex + 1;
-        setCurrentGroupIndex(nextGroupIndex);
-        setCurrentStoryIndex(0);
-        callbacksRef.current.onGroupChange?.(groups[nextGroupIndex]!, nextGroupIndex);
-      } else {
-        callbacksRef.current.onComplete?.();
-        callbacksRef.current.onClose();
-      }
-    };
-  }, [currentGroup, currentStoryIndex, currentGroupIndex, groups]);
+  const handlePrevGroup = useCallback(() => {
+    handlePrevGroupOrResumeRef.current();
+  }, []);
 
-  useEffect(() => {
-    handlePrevRef.current = () => {
-      if (currentStoryIndex > 0) {
-        setCurrentStoryIndex(currentStoryIndex - 1);
-      } else if (currentGroupIndex > 0) {
-        const prevGroupIndex = currentGroupIndex - 1;
-        const prevGroup = groups[prevGroupIndex];
-        setCurrentGroupIndex(prevGroupIndex);
-        setCurrentStoryIndex(
-          prevGroup ? prevGroup.stories.length - 1 : 0,
-        );
-        if (prevGroup) {
-          callbacksRef.current.onGroupChange?.(prevGroup, prevGroupIndex);
-        }
-      }
-    };
-  }, [currentStoryIndex, currentGroupIndex, groups]);
-
-  // ─────────────────────────────────────────
-  // Progress Animation
-  // ─────────────────────────────────────────
-
-  /**
-   * Starts or restarts the progress bar.
-   * Uses story's own durationMs, fallback to config.defaultDurationMs.
-   */
   const startProgress = useCallback(() => {
     if (!currentStory) return;
 
-    const duration = currentStory.durationMs && currentStory.durationMs > 0
-      ? currentStory.durationMs
-      : config.defaultDurationMs;
+    const duration = resolveStoryDurationMs(
+      currentStory,
+      detectedDurationMsRef.current,
+      config.defaultDurationMs,
+    );
+    activeDurationMsRef.current = duration;
 
     cancelAnimation(progress);
     progress.value = 0;
+
+    if (isPausedRef.current) {
+      return;
+    }
 
     progress.value = withTiming(
       1,
@@ -153,32 +144,34 @@ export function useStoryViewer(params: {
     );
   }, [currentStory, config.defaultDurationMs, handleNext, progress]);
 
-  /**
-   * Pause animation (for long press or pan gesture).
-   * Preserves current progress value, cancels withTiming.
-   */
   const pauseProgress = useCallback(() => {
     cancelAnimation(progress);
+    isPausedRef.current = true;
     setIsPaused(true);
   }, [progress]);
 
-  /**
-   * Resumes paused animation from where it left off.
-   */
   const resumeProgress = useCallback(() => {
     if (!currentStory) return;
+    isPausedRef.current = false;
     setIsPaused(false);
 
-    const duration = currentStory.durationMs && currentStory.durationMs > 0
-      ? currentStory.durationMs
-      : config.defaultDurationMs;
+    if (!isMediaReadyRef.current) {
+      return;
+    }
 
-    // Calculate remaining time
+    const duration =
+      activeDurationMsRef.current ||
+      resolveStoryDurationMs(
+        currentStory,
+        detectedDurationMsRef.current,
+        config.defaultDurationMs,
+      );
+
     const remaining = duration * (1 - progress.value);
 
     progress.value = withTiming(
       1,
-      { duration: Math.max(remaining, 100), easing: Easing.linear },
+      { duration: Math.max(remaining, 80), easing: Easing.linear },
       (isFinished) => {
         if (isFinished) {
           runOnJS(handleNext)();
@@ -187,28 +180,120 @@ export function useStoryViewer(params: {
     );
   }, [currentStory, config.defaultDurationMs, handleNext, progress]);
 
+  const toggleMute = useCallback(() => {
+    setIsMuted((prev) => !prev);
+  }, []);
+
   // ─────────────────────────────────────────
-  // Media Ready Callback
+  // Navigation Ref Implementations
   // ─────────────────────────────────────────
 
-  /**
-   * Called when media is loaded by the StoryMedia component.
-   * Progress bar only starts after this function is called.
-   */
-  const notifyMediaReady = useCallback(() => {
+  useEffect(() => {
+    handleNextGroupRef.current = () => {
+      if (currentGroupIndex < groups.length - 1) {
+        const nextGroupIdx = currentGroupIndex + 1;
+        const nextGroup = groups[nextGroupIdx];
+        setCurrentGroupIndex(nextGroupIdx);
+        setCurrentStoryIndex(
+          resolveInitialStoryIndex(
+            nextGroup,
+            undefined,
+            config.startFromFirstUnseen,
+          ),
+        );
+        isPausedRef.current = false;
+        setIsPaused(false);
+        if (nextGroup) {
+          callbacksRef.current.onGroupChange?.(nextGroup, nextGroupIdx);
+        }
+      } else {
+        callbacksRef.current.onComplete?.();
+        callbacksRef.current.onClose();
+      }
+    };
+  }, [currentGroupIndex, groups, config.startFromFirstUnseen]);
+
+  useEffect(() => {
+    handlePrevGroupOrResumeRef.current = () => {
+      if (currentGroupIndex > 0) {
+        const prevGroupIdx = currentGroupIndex - 1;
+        const prevGroup = groups[prevGroupIdx];
+        setCurrentGroupIndex(prevGroupIdx);
+        setCurrentStoryIndex(
+          resolveInitialStoryIndex(
+            prevGroup,
+            undefined,
+            config.startFromFirstUnseen,
+          ),
+        );
+        isPausedRef.current = false;
+        setIsPaused(false);
+        if (prevGroup) {
+          callbacksRef.current.onGroupChange?.(prevGroup, prevGroupIdx);
+        }
+      } else {
+        resumeProgress();
+      }
+    };
+  }, [currentGroupIndex, groups, config.startFromFirstUnseen, resumeProgress]);
+
+  useEffect(() => {
+    handleNextRef.current = () => {
+      if (!currentGroup) return;
+
+      if (currentStoryIndex < currentGroup.stories.length - 1) {
+        setCurrentStoryIndex(currentStoryIndex + 1);
+        isPausedRef.current = false;
+        setIsPaused(false);
+      } else {
+        handleNextGroupRef.current();
+      }
+    };
+  }, [currentGroup, currentStoryIndex]);
+
+  useEffect(() => {
+    handlePrevRef.current = () => {
+      if (currentStoryIndex > 0) {
+        setCurrentStoryIndex(currentStoryIndex - 1);
+        isPausedRef.current = false;
+        setIsPaused(false);
+      } else if (currentGroupIndex > 0) {
+        const prevGroupIdx = currentGroupIndex - 1;
+        const prevGroup = groups[prevGroupIdx];
+        setCurrentGroupIndex(prevGroupIdx);
+        setCurrentStoryIndex(
+          prevGroup ? Math.max(prevGroup.stories.length - 1, 0) : 0,
+        );
+        isPausedRef.current = false;
+        setIsPaused(false);
+        if (prevGroup) {
+          callbacksRef.current.onGroupChange?.(prevGroup, prevGroupIdx);
+        }
+      } else {
+        // Restart first story when tapping back at the beginning
+        isPausedRef.current = false;
+        setIsPaused(false);
+        startProgress();
+      }
+    };
+  }, [currentStoryIndex, currentGroupIndex, groups, startProgress]);
+
+  // ─────────────────────────────────────────
+  // Media Callbacks
+  // ─────────────────────────────────────────
+
+  const notifyMediaReady = useCallback((meta?: StoryMediaReadyMeta) => {
+    detectedDurationMsRef.current = meta?.durationMs;
+    isMediaReadyRef.current = true;
     setIsMediaReady(true);
   }, []);
 
-  /**
-   * Called by StoryMedia when the video ends.
-   * Immediately transitions to the next story.
-   */
   const notifyVideoEnd = useCallback(() => {
     handleNext();
   }, [handleNext]);
 
   // ─────────────────────────────────────────
-  // Pan Gesture (Swipe Down → Close)
+  // Gestures (Vertical Dismiss + Horizontal Group Swipe + LongPress Pause)
   // ─────────────────────────────────────────
 
   const handleClose = useCallback(() => {
@@ -216,33 +301,62 @@ export function useStoryViewer(params: {
   }, []);
 
   const panGesture = Gesture.Pan()
+    .minDistance(12)
     .onStart(() => {
-      // Pause progress when pan starts
+      gestureAxis.value = 'none';
       runOnJS(pauseProgress)();
     })
     .onChange((event) => {
-      // Only allow downward swiping
-      if (event.translationY > 0) {
-        translateY.value = event.translationY;
+      if (gestureAxis.value === 'none') {
+        gestureAxis.value =
+          Math.abs(event.translationX) > Math.abs(event.translationY)
+            ? 'horizontal'
+            : 'vertical';
+      }
+
+      if (gestureAxis.value === 'vertical') {
+        translateY.value = Math.max(0, event.translationY);
+      } else {
+        translateX.value = event.translationX * 0.85;
       }
     })
     .onEnd((event) => {
-      if (event.translationY > config.dismissThreshold) {
-        // Swiped down enough → close
-        runOnJS(handleClose)();
+      const axis = gestureAxis.value;
+      gestureAxis.value = 'none';
+
+      if (axis === 'vertical') {
+        if (
+          event.translationY > config.dismissThreshold ||
+          event.velocityY > 900
+        ) {
+          runOnJS(handleClose)();
+        } else {
+          translateY.value = withSpring(0, { damping: 22, stiffness: 320 });
+          runOnJS(resumeProgress)();
+        }
+      } else if (axis === 'horizontal') {
+        translateX.value = withSpring(0, { damping: 24, stiffness: 320 });
+
+        if (
+          event.translationX < -config.swipeHorizontalThreshold ||
+          event.velocityX < -700
+        ) {
+          runOnJS(handleNextGroup)();
+        } else if (
+          event.translationX > config.swipeHorizontalThreshold ||
+          event.velocityX > 700
+        ) {
+          runOnJS(handlePrevGroup)();
+        } else {
+          runOnJS(resumeProgress)();
+        }
       } else {
-        // Not enough → spring back and resume progress
-        translateY.value = withSpring(0, {
-          damping: 20,
-          stiffness: 300,
-        });
+        translateX.value = 0;
+        translateY.value = 0;
         runOnJS(resumeProgress)();
       }
     });
 
-  /**
-   * Long press gesture: pause on press, resume on release.
-   */
   const longPressGesture = Gesture.LongPress()
     .minDuration(200)
     .onStart(() => {
@@ -256,42 +370,71 @@ export function useStoryViewer(params: {
   // Animated Styles
   // ─────────────────────────────────────────
 
-  const containerAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
+  const containerAnimatedStyle = useAnimatedStyle(() => {
+    const scale = interpolate(
+      translateY.value,
+      [0, 320],
+      [1, 0.92],
+      Extrapolation.CLAMP,
+    );
+
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { translateY: translateY.value },
+        { scale },
+      ],
+    };
+  });
 
   // ─────────────────────────────────────────
   // Effects
   // ─────────────────────────────────────────
 
-  // Reset when viewer opens
+  // Reset state whenever modal opens/closes
   useEffect(() => {
     if (isVisible) {
-      setCurrentGroupIndex(params.initialGroupIndex ?? 0);
-      setCurrentStoryIndex(0);
+      const targetGroupIdx = Math.max(
+        0,
+        Math.min(params.initialGroupIndex ?? 0, Math.max(groups.length - 1, 0)),
+      );
+      const targetGroup = groups[targetGroupIdx];
+      setCurrentGroupIndex(targetGroupIdx);
+      setCurrentStoryIndex(
+        resolveInitialStoryIndex(
+          targetGroup,
+          params.initialStoryIndex,
+          config.startFromFirstUnseen,
+        ),
+      );
+      isPausedRef.current = false;
       setIsPaused(false);
+      setIsMuted(config.defaultMuted);
+      isMediaReadyRef.current = false;
       setIsMediaReady(false);
+      detectedDurationMsRef.current = undefined;
+      translateX.value = 0;
       translateY.value = 0;
       cancelAnimation(progress);
       progress.value = 0;
     } else {
-      // Cleanup on close
       cancelAnimation(progress);
+      translateX.value = 0;
       translateY.value = 0;
     }
   }, [isVisible]);
 
-  // When story changes: mark media as not ready, track seen
+  // Reset progress & emit seen/change events whenever the active story changes
   useEffect(() => {
     if (!isVisible || !currentStory || !currentGroup) return;
 
-    // New story → media not ready yet, reset progress
+    isMediaReadyRef.current = false;
     setIsMediaReady(false);
+    detectedDurationMsRef.current = undefined;
     cancelAnimation(progress);
     progress.value = 0;
 
     callbacksRef.current.onStorySeen?.(currentStory, currentGroup);
-    
     callbacksRef.current.onStoryChange?.(
       currentStory,
       currentGroup,
@@ -299,15 +442,36 @@ export function useStoryViewer(params: {
     );
   }, [currentStoryIndex, currentGroupIndex, isVisible]);
 
-  // Start progress when media is ready
+  // Start progress animation once media reports ready
   useEffect(() => {
     if (!isVisible || !isMediaReady || !currentStory) return;
     startProgress();
-  }, [isMediaReady, isVisible, currentStory]);
+  }, [isMediaReady, isVisible, currentStory, startProgress]);
 
-  // ─────────────────────────────────────────
-  // Return
-  // ─────────────────────────────────────────
+  // Prefetch upcoming story images/posters in the background
+  useEffect(() => {
+    if (!isVisible || !config.prefetchNextMedia) return;
+
+    const urls = getPrefetchUrls(
+      groups,
+      currentGroupIndex,
+      currentStoryIndex,
+      config.startFromFirstUnseen,
+    );
+
+    urls.forEach((url) => {
+      Promise.resolve(Image.prefetch(url)).catch(() => {
+        // Ignore background prefetch errors
+      });
+    });
+  }, [
+    isVisible,
+    config.prefetchNextMedia,
+    config.startFromFirstUnseen,
+    groups,
+    currentGroupIndex,
+    currentStoryIndex,
+  ]);
 
   return {
     // Current state
@@ -316,10 +480,12 @@ export function useStoryViewer(params: {
     currentGroupIndex,
     currentStoryIndex,
     isPaused,
+    isMuted,
     isMediaReady,
 
     // Shared values (Reanimated)
     progress,
+    translateX,
     translateY,
 
     // Animated styles
@@ -332,10 +498,14 @@ export function useStoryViewer(params: {
     // Actions
     handleNext,
     handlePrev,
+    handleNextGroup,
+    handlePrevGroup,
     pauseProgress,
     resumeProgress,
+    toggleMute,
+    setIsMuted,
 
-    // Media callbacks (to be passed to StoryMedia)
+    // Media callbacks (pass to StoryMedia)
     notifyMediaReady,
     notifyVideoEnd,
   };

@@ -1,45 +1,76 @@
-/**
- * StoryHeader — Story Header Area
- *
- * Component displayed at the top of the story viewer:
- * - Left: Avatar image + Group/user name
- * - Right: Close (X) button
- *
- * Text shadow is applied to text and icons (readability over background image).
- */
-
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import type { StoryHeaderProps } from '../types/story.types';
 
-export function StoryHeader({ avatarUrl, name, onClose, renderCloseButton }: StoryHeaderProps) {
+export function StoryHeader({
+  avatarUrl,
+  name,
+  timestamp,
+  ringColor,
+  showMuteButton = false,
+  isMuted = false,
+  onToggleMute,
+  onClose,
+  renderMuteButton,
+  renderCloseButton,
+}: StoryHeaderProps) {
   return (
-    <View style={styles.container}>
-      {/* Avatar + Name */}
-      <View style={styles.userInfo}>
+    <View style={styles.container} pointerEvents="box-none">
+      {/* Avatar + Name + Timestamp */}
+      <View style={styles.userInfo} pointerEvents="none">
         <Image
           source={{ uri: avatarUrl }}
-          style={styles.avatar}
+          style={[
+            styles.avatar,
+            ringColor ? { borderColor: ringColor } : null,
+          ]}
           contentFit="cover"
         />
         <Text style={styles.name} numberOfLines={1}>
           {name}
         </Text>
+        {timestamp ? (
+          <Text style={styles.timestamp} numberOfLines={1}>
+            {timestamp}
+          </Text>
+        ) : null}
       </View>
 
-      {/* Close Button */}
-      <TouchableOpacity
-        onPress={onClose}
-        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        style={styles.closeButton}
-      >
-        {renderCloseButton ? (
-          renderCloseButton()
-        ) : (
-          <Text style={styles.defaultCloseIcon}>✕</Text>
-        )}
-      </TouchableOpacity>
+      {/* Action Buttons: Mute + Close */}
+      <View style={styles.actions} pointerEvents="box-none">
+        {showMuteButton && onToggleMute ? (
+          <TouchableOpacity
+            onPress={onToggleMute}
+            hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+            style={styles.iconButton}
+            accessibilityRole="button"
+            accessibilityLabel={isMuted ? 'Unmute story' : 'Mute story'}
+          >
+            {renderMuteButton ? (
+              renderMuteButton(isMuted)
+            ) : (
+              <View style={styles.muteBadge}>
+                <Text style={styles.muteIcon}>{isMuted ? '🔇' : '🔊'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ) : null}
+
+        <TouchableOpacity
+          onPress={onClose}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={styles.iconButton}
+          accessibilityRole="button"
+          accessibilityLabel="Close story viewer"
+        >
+          {renderCloseButton ? (
+            renderCloseButton()
+          ) : (
+            <Text style={styles.defaultCloseIcon}>✕</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -54,6 +85,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: 8,
   },
   avatar: {
     width: 36,
@@ -61,30 +93,55 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginRight: 10,
     borderWidth: 1.5,
-    borderColor: 'transparent', // Can be customized via theme later
+    borderColor: 'rgba(255, 255, 255, 0.45)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   name: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    fontSize: 15,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0, 0, 0, 0.55)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 5,
+    textShadowRadius: 4,
     flexShrink: 1,
   },
-  closeButton: {
-    marginLeft: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.5,
-    shadowRadius: 3,
+  timestamp: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 13,
+    fontWeight: '500',
+    marginLeft: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.55)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  muteBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.32)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  muteIcon: {
+    fontSize: 15,
   },
   defaultCloseIcon: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+    lineHeight: 26,
+    paddingHorizontal: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.55)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 4,
   },
 });

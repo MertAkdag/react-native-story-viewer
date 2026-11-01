@@ -1,38 +1,27 @@
-/**
- * Story SDK — Public API (Barrel Export)
- *
- * This file is the only entry point of the package to the outside world.
- * Users should only import from here:
- *
- * ```ts
- * import {
- *   StoryViewer,
- *   useStoryViewer,
- * } from './story';
- * ```
- *
- * When published as an NPM package in the future:
- *
- * ```ts
- * import { StoryViewer } from '@mertakdag/react-native-story-viewer';
- * ```
- */
-
-// ── Main Component ──
+// ── Main Components ──
 export { default as StoryViewer } from './StoryViewer';
+export { StoryAvatarList } from './components/StoryAvatarList';
 
-// ── Sub-components (advanced usage: for those who want to create their own layout) ──
+// ── Composable Sub-components ──
 export { StoryProgressBar } from './components/StoryProgressBar';
 export { StoryHeader } from './components/StoryHeader';
 export { StoryMedia } from './components/StoryMedia';
 export { StoryCta } from './components/StoryCta';
 
-// ── Hook (headless usage: for those who want to create their own UI) ──
+// ── Headless Hook & Utilities ──
 export { useStoryViewer } from './hooks/useStoryViewer';
+export type { UseStoryViewerParams } from './hooks/useStoryViewer';
+export {
+  isStoryGroupSeen,
+  resolveInitialStoryIndex,
+  resolveStoryDurationMs,
+  getPrefetchUrls,
+} from './utils/story.utils';
 
-// ── Types (type-only export — not added to bundle) ──
+// ── Public TypeScript Types ──
 export type {
   StoryCtaData,
+  StoryMediaReadyMeta,
   StoryItem,
   StoryGroup,
   StoryViewerTheme,
@@ -44,4 +33,5 @@ export type {
   StoryHeaderProps,
   StoryMediaProps,
   StoryCtaProps,
+  StoryAvatarListProps,
 } from './types/story.types';

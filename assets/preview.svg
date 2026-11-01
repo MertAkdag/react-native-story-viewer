@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" width="1200" height="560" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#090B10"/>
+      <stop offset="55%" stop-color="#111522"/>
+      <stop offset="100%" stop-color="#171226"/>
+    </linearGradient>
+    <linearGradient id="ringActive" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="50%" stop-color="#E1306C"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="storyCard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="50%" stop-color="#312E81"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="topScrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.65"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="bottomScrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.75"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="0.78" cy="0.5" r="0.42">
+      <stop offset="0%" stop-color="#E1306C" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#E1306C" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Canvas -->
+  <rect width="1200" height="560" rx="24" fill="url(#bg)"/>
+  <rect width="1200" height="560" rx="24" fill="url(#glow1)"/>
+  <rect x="1" y="1" width="1198" height="558" rx="23" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+
+  <!-- Left Copy -->
+  <g transform="translate(72, 86)">
+    <rect x="0" y="0" width="234" height="32" rx="16" fill="rgba(225,48,108,0.14)" stroke="rgba(225,48,108,0.4)"/>
+    <text x="18" y="21" fill="#F472B6" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif" font-size="13" font-weight="600" letter-spacing="0.4">EXPO &amp; REACT NATIVE · 60 FPS</text>
+
+    <text x="0" y="92" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif" font-size="44" font-weight="800" letter-spacing="-0.8">react-native</text>
+    <text x="0" y="142" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif" font-size="44" font-weight="800" letter-spacing="-0.8">story-viewer</text>
+
+    <text x="0" y="190" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif" font-size="17" font-weight="400">Instagram &amp; Snapchat-style story tray + full-screen viewer.</text>
+    <text x="0" y="216" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif" font-size="17" font-weight="400">Ready-to-use UI components or headless hook control.</text>
+
+    <!-- Feature Pills -->
+    <g transform="translate(0, 256)">
+      <rect x="0" y="0" width="160" height="38" rx="10" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+      <text x="16" y="24" fill="#E2E8F0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="600">StoryAvatarList</text>
+
+      <rect x="172" y="0" width="184" height="38" rx="10" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+      <text x="188" y="24" fill="#E2E8F0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="600">Image &amp; Video Sync</text>
+
+      <rect x="368" y="0" width="168" height="38" rx="10" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+      <text x="384" y="24" fill="#E2E8F0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="600">Reanimated v3/v4</text>
+
+      <rect x="0" y="50" width="174" height="38" rx="10" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+      <text x="16" y="74" fill="#E2E8F0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="600">Headless Hook API</text>
+
+      <rect x="186" y="50" width="166" height="38" rx="10" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+      <text x="202" y="74" fill="#E2E8F0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="600">Gesture Controls</text>
+
+      <rect x="364" y="50" width="172" height="38" rx="10" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+      <text x="380" y="74" fill="#E2E8F0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="600">100% TypeScript</text>
+    </g>
+
+    <!-- StoryAvatarList Mini Preview Card -->
+    <g transform="translate(0, 368)">
+      <rect x="0" y="0" width="350" height="92" rx="16" fill="rgba(15,23,42,0.8)" stroke="rgba(255,255,255,0.1)"/>
+      <!-- Ring 1 (unseen) -->
+      <circle cx="48" cy="40" r="24" stroke="url(#ringActive)" stroke-width="3"/>
+      <circle cx="48" cy="40" r="19" fill="#334155"/>
+      <text x="48" y="80" text-anchor="middle" fill="#E2E8F0" font-family="-apple-system, sans-serif" font-size="11" font-weight="600">New Drop</text>
+      <!-- Ring 2 (unseen) -->
+      <circle cx="122" cy="40" r="24" stroke="url(#ringActive)" stroke-width="3"/>
+      <circle cx="122" cy="40" r="19" fill="#475569"/>
+      <text x="122" y="80" text-anchor="middle" fill="#E2E8F0" font-family="-apple-system, sans-serif" font-size="11" font-weight="600">Studio</text>
+      <!-- Ring 3 (unseen) -->
+      <circle cx="196" cy="40" r="24" stroke="url(#ringActive)" stroke-width="3"/>
+      <circle cx="196" cy="40" r="19" fill="#3B3F5C"/>
+      <text x="196" y="80" text-anchor="middle" fill="#E2E8F0" font-family="-apple-system, sans-serif" font-size="11" font-weight="600">Behind</text>
+      <!-- Ring 4 (seen) -->
+      <circle cx="270" cy="40" r="24" stroke="#64748B" stroke-width="2.5"/>
+      <circle cx="270" cy="40" r="19" fill="#1E293B"/>
+      <text x="270" y="80" text-anchor="middle" fill="#94A3B8" font-family="-apple-system, sans-serif" font-size="11">Archive</text>
+    </g>
+  </g>
+
+  <!-- Right Phone Mockup -->
+  <g transform="translate(815, 36)">
+    <!-- Phone Frame -->
+    <rect x="0" y="0" width="276" height="488" rx="38" fill="#0B0F19" stroke="rgba(255,255,255,0.2)" stroke-width="3"/>
+    <!-- Screen -->
+    <rect x="10" y="10" width="256" height="468" rx="30" fill="url(#storyCard)"/>
+
+    <!-- Abstract Artwork Inside Story -->
+    <circle cx="190" cy="180" r="95" fill="rgba(225,48,108,0.28)"/>
+    <circle cx="95" cy="270" r="110" fill="rgba(99,102,241,0.28)"/>
+    <circle cx="145" cy="230" r="56" fill="rgba(245,158,11,0.22)"/>
+
+    <!-- Top & Bottom Scrims -->
+    <rect x="10" y="10" width="256" height="105" rx="30" fill="url(#topScrim)"/>
+    <rect x="10" y="360" width="256" height="118" rx="30" fill="url(#bottomScrim)"/>
+
+    <!-- Segmented Progress Bar -->
+    <rect x="24" y="28" width="72" height="3.5" rx="1.75" fill="#FFFFFF"/>
+    <rect x="102" y="28" width="72" height="3.5" rx="1.75" fill="rgba(255,255,255,0.32)"/>
+    <rect x="102" y="28" width="46" height="3.5" rx="1.75" fill="#FFFFFF"/>
+    <rect x="180" y="28" width="72" height="3.5" rx="1.75" fill="rgba(255,255,255,0.32)"/>
+
+    <!-- Header -->
+    <circle cx="40" cy="56" r="15" fill="#475569" stroke="#E1306C" stroke-width="1.8"/>
+    <text x="64" y="59" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="700">Armillis</text>
+    <text x="118" y="59" fill="rgba(255,255,255,0.68)" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12">2h</text>
+
+    <!-- Mute & Close -->
+    <circle cx="212" cy="55" r="13" fill="rgba(0,0,0,0.32)"/>
+    <text x="212" y="59" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system, sans-serif" font-size="11" font-weight="700">🔊</text>
+    <text x="244" y="61" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system, sans-serif" font-size="17" font-weight="700">✕</text>
+
+    <!-- Center Caption -->
+    <text x="138" y="232" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="20" font-weight="800">Autumn Drop ’26</text>
+    <text x="138" y="255" text-anchor="middle" fill="rgba(255,255,255,0.78)" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12">Swipe, hold to pause, tap to explore</text>
+
+    <!-- Glassmorphic CTA Pill -->
+    <rect x="64" y="416" width="148" height="40" rx="20" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.34)" stroke-width="1.2"/>
+    <text x="138" y="441" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="700">▴  Explore Product</text>
+  </g>
+</svg>
